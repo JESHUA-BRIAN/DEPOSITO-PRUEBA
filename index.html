@@ -2,10 +2,80 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8" />
-    <title>Depósito Stock</title>
+    <title>Depósito Stock con Escáner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 30px auto;
+            padding: 0 15px;
+            background: #f9f9f9;
+            color: #333;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        label {
+            display: block;
+            margin: 12px 0 6px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            font-size: 1em;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        button {
+            margin-top: 12px;
+            width: 100%;
+            padding: 12px;
+            font-size: 1.1em;
+            background-color: #007bff;
+            border: none;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #stockList {
+            margin-top: 20px;
+            padding-left: 0;
+            list-style: none;
+        }
+        #stockList li {
+            background: white;
+            padding: 10px;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        #scanner {
+            margin-top: 20px;
+            text-align: center;
+        }
+        #interactive {
+            width: 100%;
+            max-width: 400px;
+            margin: 10px auto;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+        }
+        #toggleScan {
+            margin-top: 12px;
+            background-color: #28a745;
+        }
+        #toggleScan.stop {
+            background-color: #dc3545;
+        }
+    </style>
 </head>
 <body>
-    <h1>Gestión de Stock</h1>
+
+    <h1>Gestión de Stock con Escáner</h1>
     
     <label for="barcode">Código de Barras:</label>
     <input type="text" id="barcode" placeholder="Escanea o ingresa código" />
@@ -14,21 +84,31 @@
     <input type="number" id="quantity" value="1" min="1" />
     
     <button id="addBtn">Agregar stock</button>
+
+    <div id="scanner">
+        <button id="toggleScan">Iniciar escáner</button>
+        <div id="interactive" class="viewport"></div>
+    </div>
     
     <h2>Productos en Stock</h2>
     <ul id="stockList"></ul>
     
+    <!-- Librería QuaggaJS desde CDN -->
+    <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
     <script>
         const stock = {};
         const barcodeInput = document.getElementById('barcode');
         const quantityInput = document.getElementById('quantity');
         const addBtn = document.getElementById('addBtn');
         const stockList = document.getElementById('stockList');
-        
+        const toggleScanBtn = document.getElementById('toggleScan');
+
+        let scanning = false;
+
         addBtn.addEventListener('click', () => {
             const code = barcodeInput.value.trim();
             const qty = parseInt(quantityInput.value);
-            
+
             if (!code) {
                 alert('Por favor, ingresa un código de barras');
                 return;
@@ -37,18 +117,18 @@
                 alert('Cantidad inválida');
                 return;
             }
-            
+
             if (stock[code]) {
                 stock[code] += qty;
             } else {
                 stock[code] = qty;
             }
-            
+
             updateStockList();
             barcodeInput.value = '';
             quantityInput.value = 1;
         });
-        
+
         function updateStockList() {
             stockList.innerHTML = '';
             for (const code in stock) {
@@ -57,6 +137,68 @@
                 stockList.appendChild(li);
             }
         }
+
+        // Función para iniciar Quagga
+        function startScanner() {
+            if (scanning) return;
+            scanning = true;
+            toggleScanBtn.textContent = 'Detener escáner';
+            toggleScanBtn.classList.add('stop');
+
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#interactive'),
+                    constraints: {
+                        facingMode: "environment" // usar cámara trasera si es posible
+                    },
+                },
+                decoder: {
+                    readers: ["ean_reader", "code_128_reader", "upc_reader", "upc_e_reader"]
+                },
+                locate: true
+            }, function(err) {
+                if (err) {
+                    console.error(err);
+                    alert('Error al iniciar la cámara: ' + err.message);
+                    stopScanner();
+                    return;
+                }
+                Quagga.start();
+            });
+
+            Quagga.onDetected(onDetected);
+        }
+
+        function stopScanner() {
+            if (!scanning) return;
+            scanning = false;
+            toggleScanBtn.textContent = 'Iniciar escáner';
+            toggleScanBtn.classList.remove('stop');
+
+            Quagga.stop();
+            Quagga.offDetected(onDetected);
+            const interactive = document.getElementById('interactive');
+            interactive.innerHTML = '';
+        }
+
+        // Al detectar un código
+        function onDetected(result) {
+            const code = result.codeResult.code;
+            barcodeInput.value = code;
+            stopScanner();
+            quantityInput.focus();
+        }
+
+        toggleScanBtn.addEventListener('click', () => {
+            if (scanning) {
+                stopScanner();
+            } else {
+                startScanner();
+            }
+        });
+
     </script>
 </body>
 </html>
