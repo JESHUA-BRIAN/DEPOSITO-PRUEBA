@@ -1,204 +1,257 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8" />
-    <title>Depósito Stock con Escáner</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 30px auto;
-            padding: 0 15px;
-            background: #f9f9f9;
-            color: #333;
-        }
-        h1, h2 {
-            text-align: center;
-        }
-        label {
-            display: block;
-            margin: 12px 0 6px;
-            font-weight: bold;
-        }
-        input[type="text"], input[type="number"] {
-            width: 100%;
-            padding: 8px;
-            font-size: 1em;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-        }
-        button {
-            margin-top: 12px;
-            width: 100%;
-            padding: 12px;
-            font-size: 1.1em;
-            background-color: #007bff;
-            border: none;
-            color: white;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        #stockList {
-            margin-top: 20px;
-            padding-left: 0;
-            list-style: none;
-        }
-        #stockList li {
-            background: white;
-            padding: 10px;
-            margin-bottom: 6px;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        #scanner {
-            margin-top: 20px;
-            text-align: center;
-        }
-        #interactive {
-            width: 100%;
-            max-width: 400px;
-            margin: 10px auto;
-            border: 2px solid #007bff;
-            border-radius: 8px;
-        }
-        #toggleScan {
-            margin-top: 12px;
-            background-color: #28a745;
-        }
-        #toggleScan.stop {
-            background-color: #dc3545;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Sistema de Stock</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      text-align: center;
+    }
+    .form {
+      margin-bottom: 20px;
+      padding: 20px;
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    input.valid {
+      border-color: green;
+    }
+    input.invalid {
+      border-color: red;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 15px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button.secondary {
+      background-color: #007bff;
+    }
+    #productNameContainer {
+      display: none;
+    }
+    #barcodeMessage {
+      margin-top: 5px;
+      font-size: 14px;
+    }
+    #barcodeMessage.valid {
+      color: green;
+    }
+    #barcodeMessage.invalid {
+      color: red;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      background-color: white;
+      margin-bottom: 5px;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.05);
+    }
+    li span {
+      display: block;
+    }
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      margin: 20px auto;
+      display: none;
+    }
+  </style>
 </head>
 <body>
 
-    <h1>Gestión de Stock con Escáner</h1>
-    
+  <h1>Gestión de Stock</h1>
+
+  <div class="form">
     <label for="barcode">Código de Barras:</label>
-    <input type="text" id="barcode" placeholder="Escanea o ingresa código" />
-    
-    <label for="quantity">Cantidad:</label>
-    <input type="number" id="quantity" value="1" min="1" />
-    
-    <button id="addBtn">Agregar stock</button>
+    <input type="text" id="barcode" placeholder="Escanea o escribe el código">
+    <div id="barcodeMessage"></div>
 
-    <div id="scanner">
-        <button id="toggleScan">Iniciar escáner</button>
-        <div id="interactive" class="viewport"></div>
+    <div id="productNameContainer">
+      <label for="productName">Nombre del Producto:</label>
+      <input type="text" id="productName" placeholder="Nombre del producto nuevo">
     </div>
-    
-    <h2>Productos en Stock</h2>
-    <ul id="stockList"></ul>
-    
-    <!-- Librería QuaggaJS desde CDN -->
-    <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
-    <script>
-        const stock = {};
-        const barcodeInput = document.getElementById('barcode');
-        const quantityInput = document.getElementById('quantity');
-        const addBtn = document.getElementById('addBtn');
-        const stockList = document.getElementById('stockList');
-        const toggleScanBtn = document.getElementById('toggleScan');
 
-        let scanning = false;
+    <label for="quantity">Cantidad:</label>
+    <input type="number" id="quantity" value="1" min="1">
 
-        addBtn.addEventListener('click', () => {
-            const code = barcodeInput.value.trim();
-            const qty = parseInt(quantityInput.value);
+    <button id="addBtn">Agregar al Stock</button>
+    <button id="startScan" class="secondary">📷 Escanear con Cámara</button>
+    <button id="stopScan" class="secondary" style="display:none;">✖ Detener Escaneo</button>
+  </div>
 
-            if (!code) {
-                alert('Por favor, ingresa un código de barras');
-                return;
-            }
-            if (qty <= 0 || isNaN(qty)) {
-                alert('Cantidad inválida');
-                return;
-            }
+  <div id="reader"></div>
 
-            if (stock[code]) {
-                stock[code] += qty;
-            } else {
-                stock[code] = qty;
-            }
+  <h2>Stock Actual:</h2>
+  <ul id="stockList"></ul>
 
-            updateStockList();
-            barcodeInput.value = '';
-            quantityInput.value = 1;
-        });
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script>
+    let stock = {};
+    const barcodeInput = document.getElementById('barcode');
+    const productNameContainer = document.getElementById('productNameContainer');
+    const productNameInput = document.getElementById('productName');
+    const quantityInput = document.getElementById('quantity');
+    const addBtn = document.getElementById('addBtn');
+    const stockList = document.getElementById('stockList');
+    const startScanBtn = document.getElementById('startScan');
+    const stopScanBtn = document.getElementById('stopScan');
+    const readerDiv = document.getElementById('reader');
+    const barcodeMessage = document.getElementById('barcodeMessage');
 
-        function updateStockList() {
-            stockList.innerHTML = '';
-            for (const code in stock) {
-                const li = document.createElement('li');
-                li.textContent = `Código: ${code} - Cantidad: ${stock[code]}`;
-                stockList.appendChild(li);
-            }
+    let html5QrcodeScanner;
+
+    function loadStock() {
+      const saved = localStorage.getItem('stock');
+      if (saved) {
+        stock = JSON.parse(saved);
+        updateStockList();
+      }
+    }
+
+    function saveStock() {
+      localStorage.setItem('stock', JSON.stringify(stock));
+    }
+
+    function updateStockList() {
+      stockList.innerHTML = '';
+      for (const code in stock) {
+        const item = stock[code];
+        const li = document.createElement('li');
+        li.innerHTML = `<span><strong>${item.name}</strong></span><span>Código: ${code}</span><span>Cantidad: ${item.qty}</span>`;
+        stockList.appendChild(li);
+      }
+      saveStock();
+    }
+
+    function validateBarcode() {
+      const code = barcodeInput.value.trim();
+      if (!code) {
+        productNameContainer.style.display = 'none';
+        barcodeInput.classList.remove('valid', 'invalid');
+        barcodeMessage.textContent = '';
+        return;
+      }
+      if (stock[code]) {
+        productNameContainer.style.display = 'none';
+        barcodeInput.classList.add('valid');
+        barcodeInput.classList.remove('invalid');
+        barcodeMessage.textContent = `Producto encontrado: ${stock[code].name}`;
+        barcodeMessage.className = 'valid';
+      } else {
+        productNameContainer.style.display = 'block';
+        barcodeInput.classList.add('invalid');
+        barcodeInput.classList.remove('valid');
+        barcodeMessage.textContent = 'Producto nuevo, por favor ingresa su nombre';
+        barcodeMessage.className = 'invalid';
+      }
+    }
+
+    barcodeInput.addEventListener('input', validateBarcode);
+
+    addBtn.addEventListener('click', () => {
+      const code = barcodeInput.value.trim();
+      const qty = parseInt(quantityInput.value);
+      const name = productNameInput.value.trim();
+
+      if (!code) {
+        alert('Por favor, ingresa un código de barras');
+        return;
+      }
+      if (qty <= 0 || isNaN(qty)) {
+        alert('Cantidad inválida');
+        return;
+      }
+      if (!stock[code]) {
+        if (!name) {
+          alert('Por favor, ingresa el nombre del producto para este nuevo código');
+          return;
         }
+        stock[code] = { name: name, qty: qty };
+      } else {
+        stock[code].qty += qty;
+      }
 
-        // Función para iniciar Quagga
-        function startScanner() {
-            if (scanning) return;
-            scanning = true;
-            toggleScanBtn.textContent = 'Detener escáner';
-            toggleScanBtn.classList.add('stop');
+      updateStockList();
 
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#interactive'),
-                    constraints: {
-                        facingMode: "environment" // usar cámara trasera si es posible
-                    },
-                },
-                decoder: {
-                    readers: ["ean_reader", "code_128_reader", "upc_reader", "upc_e_reader"]
-                },
-                locate: true
-            }, function(err) {
-                if (err) {
-                    console.error(err);
-                    alert('Error al iniciar la cámara: ' + err.message);
-                    stopScanner();
-                    return;
-                }
-                Quagga.start();
-            });
+      barcodeInput.value = '';
+      productNameInput.value = '';
+      quantityInput.value = 1;
+      productNameContainer.style.display = 'none';
+      barcodeInput.classList.remove('valid', 'invalid');
+      barcodeMessage.textContent = '';
+      barcodeMessage.className = '';
+    });
 
-            Quagga.onDetected(onDetected);
+    startScanBtn.addEventListener('click', () => {
+      readerDiv.style.display = 'block';
+      startScanBtn.style.display = 'none';
+      stopScanBtn.style.display = 'inline-block';
+
+      html5QrcodeScanner = new Html5Qrcode("reader");
+
+      html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 280, height: 100 }
+        },
+        (decodedText, decodedResult) => {
+          barcodeInput.value = decodedText;
+          validateBarcode();
+          html5QrcodeScanner.stop();
+          readerDiv.style.display = 'none';
+          stopScanBtn.style.display = 'none';
+          startScanBtn.style.display = 'inline-block';
+          quantityInput.focus();
+        },
+        (errorMessage) => {
+          // errores ignorados
         }
+      ).catch(err => {
+        alert('Error iniciando cámara: ' + err);
+        readerDiv.style.display = 'none';
+        stopScanBtn.style.display = 'none';
+        startScanBtn.style.display = 'inline-block';
+      });
+    });
 
-        function stopScanner() {
-            if (!scanning) return;
-            scanning = false;
-            toggleScanBtn.textContent = 'Iniciar escáner';
-            toggleScanBtn.classList.remove('stop');
+    stopScanBtn.addEventListener('click', () => {
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop();
+      }
+      readerDiv.style.display = 'none';
+      stopScanBtn.style.display = 'none';
+      startScanBtn.style.display = 'inline-block';
+    });
 
-            Quagga.stop();
-            Quagga.offDetected(onDetected);
-            const interactive = document.getElementById('interactive');
-            interactive.innerHTML = '';
-        }
-
-        // Al detectar un código
-        function onDetected(result) {
-            const code = result.codeResult.code;
-            barcodeInput.value = code;
-            stopScanner();
-            quantityInput.focus();
-        }
-
-        toggleScanBtn.addEventListener('click', () => {
-            if (scanning) {
-                stopScanner();
-            } else {
-                startScanner();
-            }
-        });
-
-    </script>
+    loadStock();
+  </script>
 </body>
 </html>
