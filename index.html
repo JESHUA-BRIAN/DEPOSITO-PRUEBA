@@ -4,62 +4,76 @@
   <meta charset="UTF-8" />
   <title>Gestión de Stock</title>
   <style>
+    * { box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      background: #f9f9f9;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      margin: 0; padding: 30px 15px;
+      display: flex; justify-content: center;
     }
     main {
-      max-width: 600px;
-      margin: auto;
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    input, button {
-      display: block;
-      margin: 10px 0;
-      padding: 10px;
+      max-width: 480px; background: white;
+      padding: 30px; border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
       width: 100%;
-      font-size: 1em;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 25px;
+      color: #2c3e50;
     }
     label {
-      font-weight: bold;
-      margin-top: 15px;
+      display: block;
+      margin: 12px 0 6px;
+      font-weight: 600;
+    }
+    input[type="text"], input[type="number"] {
+      width: 100%; padding: 12px;
+      font-size: 1rem;
+      border: 2px solid #ccd6f6;
+      border-radius: 8px;
+    }
+    button {
+      width: 100%; padding: 14px;
+      background: #2e86de; color: white;
+      border: none; border-radius: 10px;
+      font-weight: 700; font-size: 1rem;
+      margin-top: 20px; cursor: pointer;
+    }
+    button:hover { background: #1b4f72; }
+    #scannerControls {
+      display: flex; gap: 10px; margin-top: 20px;
+    }
+    #startScan, #stopScan {
+      flex: 1; padding: 10px; border-radius: 10px;
+      font-weight: bold; border: none;
+    }
+    #startScan { background: #27ae60; color: white; }
+    #stopScan { background: #e74c3c; color: white; display: none; }
+    #reader {
+      margin-top: 20px; display: none;
+      border-radius: 12px; overflow: hidden;
     }
     #stockList {
-      list-style: none;
-      padding: 0;
+      margin-top: 30px;
+      list-style: none; padding: 0;
     }
     #stockList li {
-      background: #f0f0f0;
-      margin: 5px 0;
-      padding: 10px;
-      border-radius: 6px;
-      display: flex;
-      justify-content: space-between;
+      background: #f7f9fc;
+      margin-bottom: 10px;
+      padding: 12px;
+      border-radius: 8px;
+      display: flex; justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
+      border-left: 5px solid #2e86de;
     }
-    .delete-btn {
+    .deleteBtn {
       background: #e74c3c;
-      border: none;
-      color: white;
-      padding: 6px 10px;
-      border-radius: 6px;
+      color: white; border: none;
+      padding: 6px 10px; border-radius: 5px;
       cursor: pointer;
-      font-weight: bold;
     }
-    .delete-btn:hover {
-      background: #c0392b;
-    }
-    .valid {
-      color: green;
-    }
-    .invalid {
-      color: red;
-    }
+    .deleteBtn:hover { background: #c0392b; }
   </style>
 </head>
 <body>
@@ -67,41 +81,41 @@
   <h1>Gestión de Stock</h1>
 
   <label for="barcode">Código de Barras:</label>
-  <input type="text" id="barcode" placeholder="Código detectado o ingresa manualmente" autocomplete="off" />
-  <div id="barcodeMessage"></div>
+  <input type="text" id="barcode" placeholder="Escanéalo o escríbelo" />
 
-  <div id="productNameContainer" style="display:none;">
+  <div id="productNameContainer">
     <label for="productName">Nombre del Producto:</label>
-    <input type="text" id="productName" placeholder="Nombre del producto" autocomplete="off" />
+    <input type="text" id="productName" placeholder="Nombre del producto" />
   </div>
 
   <label for="quantity">Cantidad:</label>
-  <input type="number" id="quantity" value="1" min="1" />
+  <input type="number" id="quantity" min="1" value="1" />
 
-  <button id="addBtn">Agregar stock</button>
+  <button id="addBtn">Agregar al Stock</button>
+
+  <div id="scannerControls">
+    <button id="startScan">Escanear Código</button>
+    <button id="stopScan">Detener Escáner</button>
+  </div>
+  <div id="reader"></div>
 
   <h2>Productos en Stock</h2>
   <ul id="stockList"></ul>
 </main>
 
+<script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-  let stock = {};
-
   const barcodeInput = document.getElementById('barcode');
   const productNameInput = document.getElementById('productName');
   const quantityInput = document.getElementById('quantity');
   const addBtn = document.getElementById('addBtn');
-  const productNameContainer = document.getElementById('productNameContainer');
-  const barcodeMessage = document.getElementById('barcodeMessage');
   const stockList = document.getElementById('stockList');
+  const startScanBtn = document.getElementById('startScan');
+  const stopScanBtn = document.getElementById('stopScan');
+  const readerDiv = document.getElementById('reader');
 
-  function loadStock() {
-    const stored = localStorage.getItem('stock');
-    if (stored) {
-      stock = JSON.parse(stored);
-    }
-    updateStockList();
-  }
+  let html5QrcodeScanner;
+  let stock = JSON.parse(localStorage.getItem('stock')) || {};
 
   function saveStock() {
     localStorage.setItem('stock', JSON.stringify(stock));
@@ -113,59 +127,29 @@
       const item = stock[code];
       const li = document.createElement('li');
       li.innerHTML = `
-        <span><strong>${item.name}</strong> | Código: ${code} | Cantidad: ${item.qty}</span>
-        <button class="delete-btn" onclick="deleteProduct('${code}')">Eliminar</button>
-      `;
+        <div>
+          <strong>${item.name}</strong><br />
+          Código: ${code} | Cantidad: ${item.qty}
+        </div>
+        <button class="deleteBtn" data-code="${code}">Eliminar</button>`;
       stockList.appendChild(li);
     }
   }
 
-  function deleteProduct(code) {
-    if (confirm(`¿Eliminar el producto ${stock[code].name}?`)) {
-      delete stock[code];
-      saveStock();
-      updateStockList();
-    }
-  }
-
-  function validateBarcode() {
-    const code = barcodeInput.value.trim();
-    if (!code) {
-      productNameContainer.style.display = 'none';
-      barcodeInput.classList.remove('valid', 'invalid');
-      barcodeMessage.textContent = '';
-      return;
-    }
-    if (stock[code]) {
-      productNameContainer.style.display = 'none';
-      barcodeInput.classList.add('valid');
-      barcodeInput.classList.remove('invalid');
-      barcodeMessage.textContent = `Producto encontrado: ${stock[code].name}`;
-      barcodeMessage.className = 'valid';
-    } else {
-      productNameContainer.style.display = 'block';
-      barcodeInput.classList.add('invalid');
-      barcodeInput.classList.remove('valid');
-      barcodeMessage.textContent = 'Producto nuevo, por favor ingresa su nombre';
-      barcodeMessage.className = 'invalid';
-    }
-  }
-
-  barcodeInput.addEventListener('input', validateBarcode);
-
   addBtn.addEventListener('click', () => {
     const code = barcodeInput.value.trim();
-    const qty = parseInt(quantityInput.value);
     const name = productNameInput.value.trim();
+    const qty = parseInt(quantityInput.value);
 
-    if (!code) return alert('Código de barras requerido');
-    if (qty <= 0 || isNaN(qty)) return alert('Cantidad inválida');
+    if (!code || !name || qty <= 0 || isNaN(qty)) {
+      alert("Completa todos los campos correctamente.");
+      return;
+    }
 
-    if (!stock[code]) {
-      if (!name) return alert('Nombre requerido para nuevo producto');
-      stock[code] = { name, qty };
-    } else {
+    if (stock[code]) {
       stock[code].qty += qty;
+    } else {
+      stock[code] = { name, qty };
     }
 
     saveStock();
@@ -174,12 +158,53 @@
     barcodeInput.value = '';
     productNameInput.value = '';
     quantityInput.value = 1;
-    productNameContainer.style.display = 'none';
-    barcodeInput.classList.remove('valid', 'invalid');
-    barcodeMessage.textContent = '';
   });
 
-  loadStock();
+  stockList.addEventListener('click', (e) => {
+    if (e.target.classList.contains('deleteBtn')) {
+      const code = e.target.dataset.code;
+      if (confirm(`¿Eliminar el producto "${stock[code].name}"?`)) {
+        delete stock[code];
+        saveStock();
+        updateStockList();
+      }
+    }
+  });
+
+  startScanBtn.addEventListener('click', () => {
+    readerDiv.style.display = 'block';
+    startScanBtn.style.display = 'none';
+    stopScanBtn.style.display = 'inline-block';
+
+    html5QrcodeScanner = new Html5Qrcode("reader");
+    html5QrcodeScanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      (decodedText) => {
+        barcodeInput.value = decodedText;
+        html5QrcodeScanner.stop();
+        readerDiv.style.display = 'none';
+        stopScanBtn.style.display = 'none';
+        startScanBtn.style.display = 'inline-block';
+        productNameInput.focus();
+      },
+      (errorMessage) => {}
+    ).catch(err => {
+      alert("Error al iniciar la cámara: " + err);
+      readerDiv.style.display = 'none';
+      stopScanBtn.style.display = 'none';
+      startScanBtn.style.display = 'inline-block';
+    });
+  });
+
+  stopScanBtn.addEventListener('click', () => {
+    if (html5QrcodeScanner) html5QrcodeScanner.stop();
+    readerDiv.style.display = 'none';
+    stopScanBtn.style.display = 'none';
+    startScanBtn.style.display = 'inline-block';
+  });
+
+  updateStockList();
 </script>
 </body>
 </html>
